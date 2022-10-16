@@ -62,6 +62,10 @@ struct MonkeyExpr {
                 _paren:     Paren,
                 args:       Punctuated<MonkeyExpr, Comma>,
             },
+            Hash{
+                _brace:  Brace,
+                content: Punctuated<KeyValue, Comma>,
+            },
         }
             enum Literal {
                 Int(LitInt),
@@ -74,16 +78,12 @@ struct MonkeyExpr {
                     _brace:  Brace,
                     process: Vec<Statement>,
                 },
-                Hash{
-                    _brace:  Brace,
-                    content: Punctuated<KeyValue, Comma>,
-                },
             }
-                struct KeyValue {
-                    key:    MonkeyExpr,
-                    _colon: Colon,
-                    value:  MonkeyExpr,
-                }
+            struct KeyValue {
+                key:    MonkeyExpr,
+                _colon: Colon,
+                value:  MonkeyExpr,
+            }
         enum Operator {
             Plus,
             Minus,
