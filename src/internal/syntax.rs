@@ -58,12 +58,12 @@ pub enum Statement {
     //     pub Value,
     // );
 pub struct Expression(
-    pub Punctuated<ExprInner, Operator>
+    pub (ExprInner, Vec<(Operator, ExprInner)>),
 );
     pub struct ExprInner {
         pub prefix:  Option<Prefix>,
         pub _paren:  Option<Paren>,
-        pub content: Punctuated<Value, Operator>,
+        pub content: (Value, Vec<(Operator, Value)>),
     }
         pub enum Value {
             Literal(Literal),
@@ -102,6 +102,6 @@ pub struct Expression(
             Div,
         }
     pub enum Prefix {
-        // Minus,
+        Minus,
         Excram,
     }

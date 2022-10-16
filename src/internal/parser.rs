@@ -1,6 +1,6 @@
 use proc_macro2::Ident;
 use syn::{
-    parse::Parse,
+    parse::{Parse, ParseBuffer},
     token, parenthesized, braced, Lit,
 };
 
@@ -87,26 +87,43 @@ impl Parse for ElseStatement {
 }
 
 
+fn parse_op_exprs(buf: & ParseBuffer) -> syn::Result<(ExprInner, Vec<(Operator, ExprInner)>), > {
+    let fst = buf.parse()?;
+    let mut rest = Vec::new();
+    while let op = buf.parse()? {
+        rest.push((op, buf.parse()?))
+    }
+    Ok((fst, rest))
+}
 impl Parse for Expression {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         Ok(Expression(
-            input.parse_terminated(ExprInner::parse)?,
+            parse_op_exprs(&input)?,
         ))
     }
+}
+fn parse_op_values(buf: & ParseBuffer) -> syn::Result<(Value, Vec<(Operator, Value)>), > {
+    let fst = buf.parse()?;
+    let mut rest = Vec::new();
+    while let op = buf.parse()? {
+        rest.push((op, buf.parse()?))
+    }
+    Ok((fst, rest))
 }
 impl Parse for ExprInner {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let content_buf;
         let content;
         Ok(ExprInner {
-            prefix: if input.peek(token::Bang) {Some(input.parse()?)} else {None},
+            prefix: if input.peek(token::Bang) || input.peek(token::Sub) {
+                Some(input.parse()?)} else {None},
             _paren: {
                 if input.peek(token::Paren) {
                     let paren = parenthesized!(content_buf in input);
-                    content = content_buf.parse_terminated(Value::parse)?;
+                    content = parse_op_values(&content_buf)?;
                     Some(paren)
                 } else {
-                    content = input.parse_terminated(Value::parse)?;
+                    content = parse_op_values(input)?;
                     None
                 }
             },
@@ -199,6 +216,8 @@ impl Parse for Prefix {
         Ok(
             if input.peek(token::Bang) {
                 Prefix::Excram
+            } else if input.peek(token::Sub) {
+                Prefix::Minus
             } else {
                 panic!("unexpecetd prefix")
             }
