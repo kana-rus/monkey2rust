@@ -1,73 +1,84 @@
 /* DON'T execute cargo fmt or manually reformat */
 
 use proc_macro2::Ident;
-use syn::{token::{Semi, Let, Eq, Return, Paren, If, Brace, Else, Fn, Comma, Colon}, punctuated::Punctuated, LitStr, LitBool, LitInt};
+use syn::{
+    token::{Semi, Let, Eq, Return, Paren, If, Brace, Else, Fn, Comma, Colon},
+    punctuated::Punctuated,
+    LitStr, LitBool, LitInt
+};
 
 
-pub struct Program(Vec<Statement>);
+pub(super) struct Program(
+    pub Vec<Statement>
+);
 
-enum Statement {
+pub enum Statement {
     Let{
         _let:       Let,
         ident:      Ident,
         _equal:     Eq,
-        expr:       MonkeyExpr,
+        expr:       Expression,
         _semicolon: Semi,
     },
     Return{
         _return:    Return,
-        expr:       MonkeyExpr,
+        expr:       Expression,
         _semicolon: Semi,
     },
     Expr{
-        expr:       MonkeyExpr,
+        expr:       Expression,
         _semicolon: Semi,
     },
     IfElse{
         _if:       If,
         _paren:    Paren,
-        condition: MonkeyExpr,
+        condition: Expression,
         _brace:    Brace,
         process:   Vec<Statement>,
 
         after_if:  Option<ElseStatement>,
     },
 }
-    struct ElseStatement {
-        _else: Else,
-        after_else: AfterElse,
-    }
-    enum AfterElse {
-        IfStatement,
-        ElseExpr{
-            _brace:  Brace,
-            process: Vec<Statement>,
-        },
+    pub struct ElseStatement {
+        pub _else:   Else,
+        pub _brace:  Brace,
+        pub process: Vec<Statement>,
     }
 
-struct MonkeyExpr {
-    prefix:  Option<Prefix>,
-    _paren: Option<Paren>,
-    content: Box<ExprInner>,
-}
-    enum ExprInner {
-        Value(MonkeyValue),
-        Expr(Punctuated<MonkeyExpr, Operator>),
+// pub struct Expression {
+//     prefix:  Option<Prefix>,
+//     _paren:  Option<Paren>,
+//     content: Box<ExprInner>,
+// }
+    // pub enum ExprInner {
+    //     Value(Value),
+    //     Expr(Punctuated<Expression, Operator>),
+    // }
+    // pub struct ExprInner(
+    //     pub Value,
+    // );
+pub struct Expression(
+    pub Punctuated<ExprInner, Operator>
+);
+    pub struct ExprInner {
+        pub prefix:  Option<Prefix>,
+        pub _paren:  Option<Paren>,
+        pub content: Punctuated<Value, Operator>,
     }
-        enum MonkeyValue {
+        pub enum Value {
             Literal(Literal),
             Variable(Ident),
             FunctionCall{
                 ident:      Ident,
                 _paren:     Paren,
-                args:       Punctuated<MonkeyExpr, Comma>,
+                args:       Punctuated<Expression, Comma>,
             },
             Hash{
                 _brace:  Brace,
                 content: Punctuated<KeyValue, Comma>,
             },
         }
-            enum Literal {
+            pub enum Literal {
                 Int(LitInt),
                 Bool(LitBool),
                 Str(LitStr),
@@ -79,18 +90,18 @@ struct MonkeyExpr {
                     process: Vec<Statement>,
                 },
             }
-            struct KeyValue {
-                key:    MonkeyExpr,
-                _colon: Colon,
-                value:  MonkeyExpr,
+            pub struct KeyValue {
+                pub key:    Expression,
+                pub _colon: Colon,
+                pub value:  Expression,
             }
-        enum Operator {
+        pub enum Operator {
             Plus,
             Minus,
             Mul,
             Div,
         }
-    enum Prefix {
-        Minus,
+    pub enum Prefix {
+        // Minus,
         Excram,
     }
