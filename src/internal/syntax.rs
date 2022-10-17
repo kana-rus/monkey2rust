@@ -11,7 +11,7 @@ use syn::{
 pub(super) struct Program(
     pub Vec<Statement>
 );
-
+#[derive(Clone)]
 pub enum Statement {
     Let{
         _let:       Let,
@@ -39,6 +39,7 @@ pub enum Statement {
         after_if:  Option<ElseStatement>,
     },
 }
+    #[derive(Clone)]
     pub struct ElseStatement {
         pub _else:   Else,
         pub _brace:  Brace,
@@ -57,14 +58,17 @@ pub enum Statement {
     // pub struct ExprInner(
     //     pub Value,
     // );
+#[derive(Clone)]
 pub struct Expression(
     pub (ExprInner, Vec<(Operator, ExprInner)>),
 );
+    #[derive(Clone)]
     pub struct ExprInner {
         pub prefix:  Option<Prefix>,
         pub _paren:  Option<Paren>,
         pub content: (Value, Vec<(Operator, Value)>),
     }
+        #[derive(Clone)]
         pub enum Value {
             Literal(Literal),
             Variable(Ident),
@@ -78,6 +82,7 @@ pub struct Expression(
                 content: Punctuated<KeyValue, Comma>,
             },
         }
+            #[derive(Clone)]
             pub enum Literal {
                 Int(LitInt),
                 Bool(LitBool),
@@ -90,17 +95,20 @@ pub struct Expression(
                     process: Vec<Statement>,
                 },
             }
+            #[derive(Clone)]
             pub struct KeyValue {
                 pub key:    Expression,
                 pub _colon: Colon,
                 pub value:  Expression,
             }
+        #[derive(Clone)]
         pub enum Operator {
             Plus,
             Minus,
             Mul,
             Div,
         }
+    #[derive(Clone)]
     pub enum Prefix {
         Minus,
         Excram,

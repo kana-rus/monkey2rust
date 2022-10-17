@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, format_ident};
 use super::syntax::*;
 
 
@@ -122,15 +122,28 @@ impl Into<TokenStream> for Value {
             Value::FunctionCall {
                 ident,
                 _paren,
-                args
-            } => {
-                let mut rust_args = TokenStream::new();
-                for arg in args {
-                    rust_args.extend::<TokenStream>(arg.into())
+                mut args
+            } => match ident.to_string().as_str() {
+                "puts" => {
+                    let arg = args.pop().expect("'puts' takes just 1 argument: in first()").value().clone();
+                    assert!(args.is_empty(), "'puts' takes just 1 argument: in assert is_empty()");
+                    let rust_arg: TokenStream = arg.into();
+                    quote!(
+                        println!("{}", #rust_arg);
+                    )
                 }
-                quote!(
-                    #ident(#rust_args)
-                )
+                _ => {
+                    let mut rust_args = TokenStream::new();
+                    for arg in args {
+                        let rust_arg: TokenStream = arg.into();
+                        rust_args.extend::<TokenStream>(quote!(
+                            #rust_arg,
+                        ))
+                    }
+                    quote!(
+                        #ident(#rust_args)
+                    )
+                }
             },
             Value::Hash {
                 _brace,

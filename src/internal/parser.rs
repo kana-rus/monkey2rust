@@ -1,7 +1,7 @@
-use proc_macro2::Ident;
+use proc_macro2::{Ident, Span, Punct};
 use syn::{
     parse::{Parse, ParseBuffer},
-    token, parenthesized, braced, Lit,
+    token, parenthesized, braced, Lit, Error,
 };
 
 use super::syntax::*;
@@ -11,10 +11,9 @@ impl Parse for Program {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         Ok(Program({
             let mut vec = Vec::new();
-            while let Ok(stmt) = input.parse() {
-                vec.push(stmt)
+            while !input.is_empty() {
+                vec.push(input.parse()?)
             }
-            assert!(input.is_empty(), "unexpected token at the end of 'else {{ }}'");
             vec
         }))
     }
@@ -47,10 +46,9 @@ impl Parse for Statement {
                     _brace: braced!(process_buf in input),
                     process: {
                         let mut vec = Vec::new();
-                        while let Ok(stmt) = process_buf.parse() {
-                            vec.push(stmt)
+                        while !process_buf.is_empty() {
+                            vec.push(process_buf.parse()?)
                         }
-                        assert!(process_buf.is_empty(), "unexpected token at the end of 'else {{ }}'");
                         vec
                     },
                     after_if: {
@@ -61,7 +59,7 @@ impl Parse for Statement {
                 }
             } else {
                 Statement::Expr {
-                    expr: input.parse()?,
+                    expr:       input.parse()?,
                     _semicolon: input.parse()?
                 }
             }
@@ -76,8 +74,8 @@ impl Parse for ElseStatement {
             _brace:  braced!(process_buf in input),
             process: {
                 let mut vec = Vec::new();
-                while let Ok(stmt) = process_buf.parse() {
-                    vec.push(stmt)
+                while !process_buf.is_empty() {
+                    vec.push(process_buf.parse()?)
                 }
                 assert!(process_buf.is_empty(), "unexpected token at the end of 'else {{ }}'");
                 vec
@@ -87,11 +85,11 @@ impl Parse for ElseStatement {
 }
 
 
-fn parse_op_exprs(buf: & ParseBuffer) -> syn::Result<(ExprInner, Vec<(Operator, ExprInner)>), > {
-    let fst = buf.parse()?;
+fn parse_op_exprs(buf: & ParseBuffer) -> syn::Result<(ExprInner, Vec<(Operator, ExprInner)>)> {
+    let fst = buf.parse().expect("in fst of op_exprs");// ?;
     let mut rest = Vec::new();
-    while !buf.is_empty() {
-        rest.push((buf.parse()?, buf.parse()?))
+    while let Ok(op) = buf.parse() {
+        rest.push((op, buf.parse().expect("in rest of op_exprs")))// ?))
     }
     Ok((fst, rest))
 }
@@ -102,11 +100,11 @@ impl Parse for Expression {
         ))
     }
 }
-fn parse_op_values(buf: & ParseBuffer) -> syn::Result<(Value, Vec<(Operator, Value)>), > {
-    let fst = buf.parse()?;
+fn parse_op_values(buf: & ParseBuffer) -> syn::Result<(Value, Vec<(Operator, Value)>)> {
+    let fst = buf.parse().expect("in fst of op_values");// ?;
     let mut rest = Vec::new();
-    while !buf.is_empty() {
-        rest.push((buf.parse()?, buf.parse()?))
+    while let Ok(op) = buf.parse() {
+        rest.push((op, buf.parse().expect("in rest of op_values")))// ?))
     }
     Ok((fst, rest))
 }
@@ -133,55 +131,59 @@ impl Parse for ExprInner {
 }
 impl Parse for Value {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        Ok(
-            if input.peek(syn::Lit) {
-                let lit = input.parse::<Lit>()?;
-                Value::Literal(match lit {
-                    Lit::Bool(boolean) => Literal::Bool(boolean),
-                    Lit::Str(string) => Literal::Str(string),
-                    Lit::Int(int) => Literal::Int(int),
-                    _ => unreachable!("expeted (Bool | Str | Int) as literal")
-                })
-            } else if input.peek(token::Fn) {
-                let args_buf;
-                let process_buf;
-                Value::Literal(Literal::Function {
-                    _fn:     input.parse()?,
-                    _paren:  parenthesized!(args_buf in input),
-                    args:    args_buf.parse_terminated(Ident::parse)?,
-                    _brace:  braced!(process_buf in input),
-                    process: {
-                        let mut vec = Vec::new();
-                        while let Ok(stmt) = process_buf.parse() {
-                            vec.push(stmt)
-                        }
-                        assert!(process_buf.is_empty(), "unexpected token at the end of 'else {{ }}'");
-                        vec
-                    },
-                })
-            } else if input.peek(syn::Ident) {
-                if input.peek2(token::Paren) {
-                    let args_buf;
-                    Value::FunctionCall {
-                        ident:  input.parse()?,
-                        _paren: parenthesized!(args_buf in input),
-                        args:   args_buf.parse_terminated(Expression::parse)?,
+        if input.peek(syn::Lit) {
+            let lit = input.parse::<Lit>()?;
+            let value = Value::Literal(match lit {
+                Lit::Bool(boolean) => Literal::Bool(boolean),
+                Lit::Str(string) => Literal::Str(string),
+                Lit::Int(int) => Literal::Int(int),
+                _ => unreachable!("expeted (Bool | Str | Int) as literal")
+            });
+            Ok(value)
+        } else if input.peek(token::Fn) {
+            let args_buf;
+            let process_buf;
+            Ok(Value::Literal(Literal::Function {
+                _fn:     input.parse()?,
+                _paren:  parenthesized!(args_buf in input),
+                args:    args_buf.parse_terminated(Ident::parse)?,
+                _brace:  braced!(process_buf in input),
+                process: {
+                    let mut vec = Vec::new();
+                    while !process_buf.is_empty() {
+                        vec.push(process_buf.parse()?)
                     }
-                } else {
-                    Value::Variable(
-                        input.parse()?,
-                    )
-                }
-            } else if input.peek(token::Brace) {
-                let content_buf;
-                Value::Hash {
-                    _brace:  braced!(content_buf in input),
-                    content: content_buf.parse_terminated(KeyValue::parse)?,
-                }
+                    vec
+                },
+            }))
+        } else if input.peek(syn::Ident) {
+            if input.peek2(token::Paren) {
+                let args_buf;
+                Ok(Value::FunctionCall {
+                    ident:  input.parse()?,
+                    _paren: parenthesized!(args_buf in input),
+                    args:   args_buf.parse_terminated(Expression::parse)?,
+                })
             } else {
-                panic!("unexpected value")
+                Ok(Value::Variable(
+                    input.parse()?,
+                ))
             }
-        )
+        } else if input.peek(token::Brace) {
+            let content_buf;
+            Ok(Value::Hash {
+                _brace:  braced!(content_buf in input),
+                content: content_buf.parse_terminated(KeyValue::parse)?,
+            })
+        } else {
+            let this =
+                if let Ok(punct) = input.parse::<Punct>() {
+                    punct.to_string()
+                } else {
+                    "unknown".into()
+                };
+            Err(Error::new(Span::call_site(), format!("unexpected value: {this}")))
+        }
     }
 }
 impl Parse for KeyValue {
@@ -196,31 +198,33 @@ impl Parse for KeyValue {
 
 impl Parse for Operator {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        Ok(
-            if input.peek(token::Add) {
-                Operator::Plus
-            } else if input.peek(token::Sub) {
-                Operator::Minus
-            } else if input.peek(token::Star) {
-                Operator::Mul
-            } else if input.peek(token::Div) {
-                Operator::Div
-            } else {
-                panic!("unexpected operator")
+        if input.peek(token::Add)
+        || input.peek(token::Sub)
+        || input.peek(token::Star)
+        || input.peek(token::Div) {
+            match input.parse::<Punct>()?.as_char() {
+                '+' => Ok(Operator::Plus),
+                '-' => Ok(Operator::Minus),
+                '*' => Ok(Operator::Mul),
+                '/' => Ok(Operator::Div),
+                 _ => unreachable!(),
             }
-        )
+        } else {
+            Err(Error::new(Span::call_site(), format!("unexpected operator")))
+        }
     }
 }
 impl Parse for Prefix {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        Ok(
-            if input.peek(token::Bang) {
-                Prefix::Excram
-            } else if input.peek(token::Sub) {
-                Prefix::Minus
-            } else {
-                panic!("unexpecetd prefix")
+        if input.peek(token::Bang)
+        || input.peek(token::Sub) {
+            match input.parse::<Punct>()?.as_char() {
+                '!' => Ok(Prefix::Excram),
+                '-' => Ok(Prefix::Minus),
+                 _ => unreachable!()
             }
-        )
+        } else {
+            Err(Error::new(Span::call_site(), format!("unexpecetd prefix")))
+        }
     }
 }
