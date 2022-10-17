@@ -1,7 +1,5 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::token;
-
 use super::syntax::*;
 
 
@@ -96,13 +94,100 @@ impl Into<TokenStream> for ExprInner {
 
         match self.prefix {
             None => (),
-            Some(prefix) => match prefix {
-                Prefix::Excram => rust_expr_inner.extend(quote!(!)),
-                Prefix::Minus => rust_expr_inner.extend(quote!(-)),
-            }
+            Some(prefix) => rust_expr_inner.extend::<TokenStream>(prefix.into()),
         }
-        let x =self.content.
+
+        let mut core = TokenStream::new();
+        let (fst, rest) = self.content;
+        core.extend::<TokenStream>(fst.into());
+        for (op, v) in rest {
+            core.extend::<TokenStream>(op.into());
+            core.extend::<TokenStream>(v.into());
+        }
+
+        rust_expr_inner.extend(
+            if self._paren.is_some() {quote!(
+                (#core)
+            )} else {core}
+        );
 
         rust_expr_inner
     }
+}
+impl Into<TokenStream> for Value {
+    fn into(self) -> TokenStream {
+        match self {
+            Value::Variable(name) => quote!(#name),
+            Value::Literal(literal) => literal.into(),
+            Value::FunctionCall {
+                ident,
+                _paren,
+                args
+            } => {
+                let mut rust_args = TokenStream::new();
+                for arg in args {
+                    rust_args.extend::<TokenStream>(arg.into())
+                }
+                quote!(
+                    #ident(#rust_args)
+                )
+            },
+            Value::Hash {
+                _brace,
+                content
+            } => panic!("Hash map is not supported in current version!")
+        }
+    }
+}
+impl Into<TokenStream> for Literal {
+    fn into(self) -> TokenStream {
+        match self {
+            Literal::Int(lit_int) => quote!(#lit_int),
+            Literal::Bool(lit_bool) => quote!(#lit_bool),
+            Literal::Str(lit_str) => quote!(#lit_str),
+            Literal::Function {
+                _fn,
+                _paren,
+                args,
+                _brace,
+                process
+            } => {
+                let mut rust_process = TokenStream::new();
+                for p in process {
+                    rust_process.extend::<TokenStream>(p.into());
+                }
+                quote!(
+                    |#args| {
+                        #rust_process
+                    }
+                )
+            }
+        }
+    }
+}
+/*
+    impl Into<TokenStream> for KeyValue {
+        fn into(self) -> TokenStream {
+
+        }
+    }
+*/
+impl Into<TokenStream> for Operator {
+    fn into(self) -> TokenStream {
+        match self {
+            Operator::Plus => quote!(+),
+            Operator::Minus => quote!(-),
+            Operator::Mul => quote!(*),
+            Operator::Div => quote!(/),
+        }
+    }
+}
+impl Into<TokenStream> for Prefix {
+    fn into(self) -> TokenStream {
+        match self {
+            Prefix::Excram => quote!(!),
+            Prefix::Minus => quote!(-),
+        }
+    }
+    
 }

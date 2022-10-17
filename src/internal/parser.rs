@@ -90,8 +90,8 @@ impl Parse for ElseStatement {
 fn parse_op_exprs(buf: & ParseBuffer) -> syn::Result<(ExprInner, Vec<(Operator, ExprInner)>), > {
     let fst = buf.parse()?;
     let mut rest = Vec::new();
-    while let op = buf.parse()? {
-        rest.push((op, buf.parse()?))
+    while !buf.is_empty() {
+        rest.push((buf.parse()?, buf.parse()?))
     }
     Ok((fst, rest))
 }
@@ -105,8 +105,8 @@ impl Parse for Expression {
 fn parse_op_values(buf: & ParseBuffer) -> syn::Result<(Value, Vec<(Operator, Value)>), > {
     let fst = buf.parse()?;
     let mut rest = Vec::new();
-    while let op = buf.parse()? {
-        rest.push((op, buf.parse()?))
+    while !buf.is_empty() {
+        rest.push((buf.parse()?, buf.parse()?))
     }
     Ok((fst, rest))
 }
